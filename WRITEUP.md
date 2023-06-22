@@ -57,20 +57,6 @@ CMD ["xiu", "-c", "/etc/xiu/config_rtmp.toml"]
 docker image build -t bgelov/xiu:1.0.0 .
 ```
 
-- Опубликовать контейнер в registry(например hub.docker.com). Формат имени контейнера <timestamp когда было получено задание>-<md5 хеш от Dockerfile>, версия 1.0.0.
-
-timestamp
-           
-Получаем md5 хеш от Dockerfile
-```
-md5sum Dockerfile | awk '{print $1}'
-```
-
-Публикуем образ в registry:
-```
-
-```
-
 ### Тестирование образа
 
 Пробуем запустить контейнер:
@@ -80,29 +66,134 @@ docker run -d -p 1935:1935 --name xiu bgelov/xiu:1.0.0
 
 Проверяем, что контейнер запущен и смотрим на логи:
 ```
-
+docker ps
+docker logs xiu
 ```
 
-Тестируем работу с использованием ffmpeg и ffplay.
-Для трансляции запускаем ffmpeg:
+Всё ок:
+```
+docker logs xiu
+[2023-06-22T20:11:41Z INFO  rtmp::rtmp] Rtmp server listening on tcp://0.0.0.0:1935
+[2023-06-22T20:11:41Z INFO  xiu::api] Http api server listening on http://:8000
+```
+
+Тестируем работу с использованием ffmpeg и ffplay. [Скачиваем](https://ffmpeg.org/download.html) приложения. [Скачиваем](https://sample-videos.com/) сэмпл видео.
+Запускаем ffmpeg, давая ему на вход скачанное видео (big_buck_bunny_720p_30mb.mp4):
 ```
 ffmpeg -re -stream_loop -1 -i big_buck_bunny_720p_30mb.mp4 -c:a copy -c:v copy -f flv -flvflags no_duration_filesize rtmp://127.0.0.1:1935/live/test
 ```
-Для просмотра запускаем ffmpeg:
+Для просмотра запускаем ffplay:
 ```
 ffplay -i rtmp://localhost:1935/live/test
 ```
 
+Успех! Мы видим мультики.
+
+### Публикация образа
+После успешного теста публикуем образ в registry.
+
+Формируем имя образа в формате `<timestamp когда было получено задание>-<md5 хеш от Dockerfile>, версия 1.0.0`:
+```
+IMAGE_NAME="$(date --utc -d "2023-06-21 11:15" +%s)-$(md5sum Dockerfile | awk '{print $1}'):1.0.0"
+echo $IMAGE_NAME
+```
+Тегаем образ необходимым для публикаци в registry именем и публикуем:
+```
+docker tag bgelov/xiu:1.0.0 bgelov/$IMAGE_NAME
+docker push bgelov/$IMAGE_NAME
+```
+
+Ссылка на образ: https://hub.docker.com/r/bgelov/1687346100-977d03e7f0746077d90baa216bbf61c2
+
+
 ## Реализуем кластер
 Необходимо реализовать rtmp-кластер из 3 инстансов, используя docker compose.
-В xiu можно реализовать кластер путём push и pull.
+Согласно [документации](https://github.com/harlanc/xiu), в xiu можно реализовать кластер путём push на остальные ноды или pull с другой ноды.
+
+Пишем docker compose файл:
+```
+
+```
+
 Пишем конфигурацию для мастер ноды:
 ```
+#live server configurations
+#######################################
+#     RTMP configurations(cluster)    #
+#######################################
+[rtmp]
+enabled = true
+port = 1935
+
+#######################################
+#  push streams to other server node  #
+#######################################
+[[rtmp.push]]
+enabled = true
+address = "xiu-server-2"
+port = 1935
+[[rtmp.push]]
+enabled = true
+address = "xiu-server-3"
+port = 1935
+
+
+######################################
+#    HLS configurations              #
+######################################
+[hls]
+enabled = true
+port = 8080
+
+
+########################################
+# HTTPFLV configurations               #
+########################################
+[httpflv]
+enabled = true
+port = 8081
+
+
+#######################################
+#   LOG configurations                #
+#######################################
+[log]
+level = "info"
 
 ```
 
 И пишем конфигурацию для остальных нод:
 ```
+#live server configurations
+#######################################
+#   RTMP configurations(stand-alone)  #
+#######################################
+[rtmp]
+enabled = true
+port = 1935
+
+
+######################################
+#    HLS configurations              #
+######################################
+[hls]
+enabled = true
+port = 8080
+
+
+########################################
+# HTTPFLV configurations               #
+########################################
+[httpflv]
+enabled = true
+port = 8081
+
+
+#######################################
+#   LOG configurations                #
+#######################################
+[log]
+level = "info"
 
 ```
 
