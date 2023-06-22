@@ -109,13 +109,56 @@ docker push bgelov/$IMAGE_NAME
 ## Реализуем кластер
 Необходимо реализовать rtmp-кластер из 3 инстансов, используя docker compose.
 Согласно [документации](https://github.com/harlanc/xiu), в xiu можно реализовать кластер путём push на остальные ноды или pull с другой ноды.
+Выбираем вариант с pull. Это значит, что у нас будет 2 типа конфигурации xiu, для мастер ноды и для обычных нод.
 
-Пишем docker compose файл:
+Создаём рабочий каталог:
+```
+mkdir xiu-compose && cd xiu-compose
 ```
 
+Пишем docker compose файл `vi docker-compose.yml`. Для упрощения файла, вынесем название образа в переменную:
+```
+services:
+  xiu-server-1:
+    container_name: xiu-server-1
+    image: ${XIU_IMAGE}
+    ports:
+      - 1935:1935
+      - 8081:8081
+      - 8080:8080
+    volumes:
+      - ./conf/master/config_rtmp.toml:/etc/xiu/config_rtmp.toml
+
+  xiu-server-2:
+    container_name: xiu-server-2
+    image: ${XIU_IMAGE}
+    ports:
+      - 1936:1935
+      - 8181:8081
+      - 8180:8080
+    volumes:
+      - ./conf/node/config_rtmp.toml:/etc/xiu/config_rtmp.toml
+
+  xiu-server-3:
+    container_name: xiu-server-3
+    image: ${XIU_IMAGE}
+    ports:
+      - 1937:1935
+      - 8281:8081
+      - 8280:8080
+    volumes:
+      - ./conf/node/config_rtmp.toml:/etc/xiu/config_rtmp.toml
 ```
 
-Пишем конфигурацию для мастер ноды:
+Рядом с docker-compose.yml создаём файл `vi .env` и добавим в него переменную `XIU_IMAGE`:
+```
+XIU_IMAGE=bgelov/1687346100-977d03e7f0746077d90baa216bbf61c2:1.0.0
+```
+
+Рядом с docker-compose.yml так же создадим структуру с конфигурациями xiu для мастер ноды и для обычной ноды. Так как нам нужны потоки rtmp, httpflv и hls, за пример возьмём конфиг `application\xiu\src\config\config_rtmp_httpflv_hls.toml`.
+
+
+Пишем конфигурацию для мастер ноды по пути `conf/master/config_rtmp.toml` с добавление блока `[[rtmp.push]]`:
 ```
 #live server configurations
 #######################################
@@ -162,7 +205,7 @@ level = "info"
 
 ```
 
-И пишем конфигурацию для остальных нод:
+Пишем конфигурацию для обычных нод `conf/node/config_rtmp.toml`
 ```
 #live server configurations
 #######################################
@@ -197,12 +240,39 @@ level = "info"
 
 ```
 
-Пишем docker compose файл:
+Запускаем кластер:
+```
+docker compose up -d
 ```
 
-```
-
-Тестируем работоспособность кластера. Успешным результатом считаем:
+### Тестируем работоспособность кластера
+Успешным результатом считаем:
 - Наличие rtmp потока у всех членов кластера
 - Просмотр потока в httpflv и hls с каждого члена кластера
 
+Запускаем ffmpeg на мастер ноду rtmp://127.0.0.1:1935, давая на вход тестовое видео (big_buck_bunny_720p_30mb.mp4):
+```
+ffmpeg -re -stream_loop -1 -i big_buck_bunny_720p_30mb.mp4 -c:a copy -c:v copy -f flv -flvflags no_duration_filesize rtmp://127.0.0.1:1935/live/test
+```
+
+Для просмотра rtmp потока запускаем ffplay на каждую ноду:
+```
+ffplay -i rtmp://localhost:1935/live/test
+ffplay -i rtmp://localhost:1936/live/test
+ffplay -i rtmp://localhost:1937/live/test
+```
+
+Для просмотра потока в httpflv и hls запускаем:
+```
+# xiu-server-1
+ffplay -i http://localhost:8081/live/test.flv
+ffplay -i http://localhost:8080/live/test/test.m3u8
+
+# xiu-server-2
+ffplay -i http://localhost:8181/live/test.flv
+ffplay -i http://localhost:8180/live/test/test.m3u8
+
+# xiu-server-3
+ffplay -i http://localhost:8281/live/test.flv
+ffplay -i http://localhost:8280/live/test/test.m3u8
+```
