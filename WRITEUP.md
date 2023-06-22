@@ -18,14 +18,36 @@
 
 # Описание решения
 ## Сборка образа
-Согласно требованиям, необходимо использовать multi-stage, собирать приложение в одном контйнере и копировать исполняемые файлы в другой контейнер с Alpine.
-Проект xiu написан на Rust, следовательно, для сборки оптимально использовать образ из ...
+Согласно требованиям, необходимо использовать multi-stage, собирать приложение в одном контейнере и копировать исполняемые файлы в другой контейнер с Alpine.
+Проект xiu написан на Rust. Следовательно, для сборки оптимально использовать образ из [официального репозитория Rust](https://hub.docker.com/_/rust). 
 
-Пишем Dockerfile.
-- необходимо добавить toml конфиг для запуска по-умолчанию
-COPY --from=builder /xiu/application/xiu/src/config/config_rtmp.toml /etc/xiu/config_rtmp.toml
+Создаём рабочий каталог и клонируем в него проект xiu:
+```
+mkdir app && cd app
+git clone https://github.com/harlanc/xiu.git 
 ```
 
+Пишем Dockerfile.
+```
+vi Dockerfile
+```
+
+- Так как runner у нас Alpine, добавляем дополнительно musl-dev.
+- Не забываем о том, что нам необходимо добавить toml конфиг для запуска по-умолчанию.
+- По дефолту запускаем `xiu -c <путь-до конфига>`.
+
+```
+FROM rust:alpine3.18 as builder
+COPY ./ ./
+WORKDIR /xiu/application/xiu
+RUN apk add --no-cache musl-dev openssl-dev
+RUN rustup target add x86_64-unknown-linux-musl
+RUN cargo build --release --target x86_64-unknown-linux-musl
+
+FROM alpine:3.18 as runner
+COPY --from=builder /xiu/target/x86_64-unknown-linux-musl/release/xiu /usr/local/bin/xiu
+COPY --from=builder /xiu/application/xiu/src/config/config_rtmp.toml /etc/xiu/config_rtmp.toml
+CMD ["xiu", "-c", "/etc/xiu/config_rtmp.toml"]
 ```
 
 Собираем образ:
