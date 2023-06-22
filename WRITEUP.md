@@ -276,3 +276,11 @@ ffplay -i http://localhost:8180/live/test/test.m3u8
 ffplay -i http://localhost:8281/live/test.flv
 ffplay -i http://localhost:8280/live/test/test.m3u8
 ```
+
+
+# Упаковка решения
+
+```
+ARCHIVE_NAME="belov-stage1-$(date --utc -d "2023-06-21 11:15" +%s)-$(date --utc +%s)"
+tar -cJf "${ARCHIVE_NAME}.tar.xz" xiu-compose xiu-image WRITEUP.md
+```
