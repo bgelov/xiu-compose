@@ -1,0 +1,30 @@
+services:
+  xiu-server-1:
+    container_name: xiu-server-1
+    image: ${XIU_IMAGE}
+    ports:
+      - 1935:1935
+      - 8081:8081
+      - 8080:8080
+    volumes:
+      - ./conf/master/config_rtmp.toml:/etc/xiu/config_rtmp.toml
+
+  xiu-server-2:
+    container_name: xiu-server-2
+    image: ${XIU_IMAGE}
+    ports:
+      - 1936:1935
+      - 8181:8081
+      - 8180:8080
+    volumes:
+      - ./conf/node/config_rtmp.toml:/etc/xiu/config_rtmp.toml
+
+  xiu-server-3:
+    container_name: xiu-server-3
+    image: ${XIU_IMAGE}
+    ports:
+      - 1937:1935
+      - 8281:8081
+      - 8280:8080
+    volumes:
+      - ./conf/node/config_rtmp.toml:/etc/xiu/config_rtmp.toml
