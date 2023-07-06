@@ -1,20 +1,10 @@
-# Задача 1
-## Описание задачи
-Необходимо реализовать rtmp-кластер на базе https://github.com/harlanc/xiu.git стрим-сервера из 3 инстансов:
+# Реализация rtmp-кластера на базе https://github.com/harlanc/xiu.git стрим-сервера из 3 инстансов
 
-Реализация кластера для проверки функционала в локальной среде, используя docker-compose.
+Реализация xiu кластера для проверки функционала в локальной среде, используя docker-compose. Просмотр потока в httpflv и hls с каждого члена кластера и наличие rtmp потока у всех членов кластера
 
-Успешным результатом будет являться:
-- Наличие rtmp потока у всех членов кластера
-- Просмотр потока в httpflv и hls с каждого члена кластера
-- Срок выполнения 2 дня
-- Решение предоставить в виде архива `petrov-stage1-1685933169-1685933170.tar.xz` (где timestamp - время получения и сдачи задания). И предоставить writeup с описанием решения WRITEUP.md в архиве.
-
-## Требования к реализации
-- Реализовать сборку артефакта и запуск в несколько стадий. В качестве раннера использовать alpine.
-- Для запуска по-умолчанию использовать toml конфиг application/xiu/src/config/config_rtmp.toml для тестирования сборки.
-- Опубликовать контейнер в registry(например hub.docker.com). Формат имени контейнера <timestamp когда было получено задание>-<md5 хеш от Dockerfile>, версия 1.0.0.
-- Для подачи и просмотра потоков использовать ffmpeg и ffplay. Семплы можно взять тут https://sample-videos.com/
+- Сборка и запуск в несколько стадий. В качестве раннера используется alpine.
+- Для запуска по умолчанию используется стандартный toml конфиг application/xiu/src/config/config_rtmp.toml.
+- Для подачи и просмотра потоков используется ffmpeg и ffplay. Семплы из https://sample-videos.com/
 
 # Описание решения
 ## Сборка образа
@@ -92,7 +82,7 @@ ffplay -i rtmp://localhost:1935/live/test
 ### Публикация образа
 После успешного теста публикуем образ в registry.
 
-Формируем имя образа в формате `<timestamp когда было получено задание>-<md5 хеш от Dockerfile>, версия 1.0.0`:
+Формируем имя образа в формате `<timestamp>-<md5 хеш от Dockerfile>, версия 1.0.0`:
 ```
 IMAGE_NAME="$(date --utc -d "2023-06-21 11:15" +%s)-$(md5sum Dockerfile | awk '{print $1}'):1.0.0"
 echo $IMAGE_NAME
@@ -275,12 +265,4 @@ ffplay -i http://localhost:8180/live/test/test.m3u8
 # xiu-server-3
 ffplay -i http://localhost:8281/live/test.flv
 ffplay -i http://localhost:8280/live/test/test.m3u8
-```
-
-
-# Упаковка решения
-
-```
-ARCHIVE_NAME="belov-stage1-$(date --utc -d "2023-06-21 11:15" +%s)-$(date --utc +%s)"
-tar -cJf "${ARCHIVE_NAME}.tar.xz" xiu-compose xiu-image WRITEUP.md
 ```
